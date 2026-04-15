@@ -210,6 +210,15 @@ def _apply_ablation_parameters(command_line_args, agent_config, dataset_config):
         dataset_config['max_test_queries'] = command_line_args.max_test_queries_ablation
         print(f"\n\nUsing max_test_queries: {dataset_config['max_test_queries']}\n\n")
 
+    # Handle max test samples ablation (default 10 for faster iteration).
+    if command_line_args.max_test_samples_ablation > 0:
+        original_samples = dataset_config.get('max_test_samples', command_line_args.max_test_samples_ablation)
+        dataset_config['max_test_samples'] = min(original_samples, command_line_args.max_test_samples_ablation)
+        print(
+            f"\n\nUsing max_test_samples: {dataset_config['max_test_samples']} "
+            f"(original: {original_samples})\n\n"
+        )
+
 
 def _apply_chunk_size_ablation(command_line_args, agent_config, dataset_config):
     """Apply chunk size ablation based on agent type."""

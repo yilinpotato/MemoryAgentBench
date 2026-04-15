@@ -42,6 +42,8 @@ def parse_command_line_arguments():
                        help='Override chunk size for ablation studies (0 = use config default)')
     parser.add_argument('--max_test_queries_ablation', type=int, default=0,
                        help='Limit maximum test queries for ablation studies (0 = no limit)')
+    parser.add_argument('--max_test_samples_ablation', type=int, default=10,
+                       help='Limit maximum test samples for ablation studies (0 = no limit)')
     parser.add_argument('--force', action='store_true', default=False,
                        help='Force re-run even if results already exist')
     return parser.parse_args()
@@ -64,9 +66,13 @@ def has_reached_query_limit(max_queries, current_query_index):
 
 def save_results_to_file(output_path, agent_config, dataset_config, results, metrics, time_cost_list, start_time):
     """Save current results to the output file."""
+    def _needs_scale(metric_name):
+        # Scores are percentages; system/latency/token metrics should remain raw.
+        return not any(token in metric_name for token in ["_len", "_time", "latency", "token_usage"])
+
     # Calculate averaged metrics for logging
     averaged_metrics = {
-        key: np.mean(values) * (1 if ("_len" in key) or ("_time" in key) else 100) 
+        key: np.mean(values) * (100 if _needs_scale(key) else 1)
         for key, values in metrics.items()
     }
     
@@ -147,6 +153,8 @@ def process_context(context_index, context_chunks, query_answer_pairs, agent_con
                    metrics, results, query_index, last_processed_context_id, last_processed_query_id,
                    max_queries, output_path, time_cost_list, start_time, force_rerun, total_contexts):
     """Process a single context and its queries."""
+    epoch_start_time = time.time()
+
     # Skip contexts that have already been fully processed
     if should_skip_context(force_rerun, context_index, last_processed_context_id):
         logger.info(f"\n\n!!!!!Experiment {context_index} already finished, skipping...\n")
@@ -167,6 +175,10 @@ def process_context(context_index, context_chunks, query_answer_pairs, agent_con
         query_index, context_index, last_processed_query_id, max_queries,
         agent_config, output_path, time_cost_list, start_time
     )
+
+    epoch_latency = time.time() - epoch_start_time
+    metrics["epoch_latency"].append(epoch_latency)
+    logger.info(f"epoch_latency(context={context_index}): {epoch_latency:.02f}")
     
     return metrics, results, query_index, False
 
@@ -201,6 +213,10 @@ def main():
             args.max_test_queries_ablation, output_path, time_cost_list, start_time,
             args.force, total_contexts
         )
+
+        # Ensure context-level metrics (e.g. epoch_latency) are persisted even when max_test_queries is small.
+        save_results_to_file(output_path, agent_config, dataset_config, results,
+                           metrics, time_cost_list, start_time)
         
         if should_break:
             break

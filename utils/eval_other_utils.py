@@ -662,8 +662,11 @@ def metrics_summarization(output, query, answer, dataset_config, metrics, result
     # Update system metrics
     metrics["input_len"].append(output["input_len"])
     metrics["output_len"].append(output["output_len"])
+    token_usage = output["input_len"] + output["output_len"]
+    metrics["token_usage"].append(token_usage)
     metrics["memory_construction_time"].append(output.get("memory_construction_time", 0))
     metrics["query_time_len"].append(output.get("query_time_len", 0))
+    output["token_usage"] = token_usage
     
     # Create result record
     result_record = {**output, "answer": answer, 'query': query}
