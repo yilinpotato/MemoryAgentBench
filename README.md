@@ -1,15 +1,6 @@
 # ⚙️ MemoryAgentBench: Evaluating Memory in LLM Agents via Incremental Multi-Turn Interactions
 
-------------------------------------------------------------
 
-我的.env文件格式：
-```
-LLM_MODEL=************ #我用的qwen3.5-plus
-LLM_API_KEY=  sk-9****************b
-LLM_BASE_URL= https://**************************/v1
-```
-
-------------------------------------------------------------
 
 [Yuanzhe Hu](https://hust-ai-hyz.github.io), [Yu Wang](https://yuwang.us), [Julian McAuley](https://cseweb.ucsd.edu/~jmcauley/).
 
@@ -111,19 +102,30 @@ To run this project, you need to configure your API keys and model settings in a
 
 Create a `.env` file and add the following content, replacing the placeholder values with your actual API keys:
 
-#### OpenAI API Keys
+------------------------------------------------------------
+
+我的.env文件格式：
+```
+LLM_MODEL=************ #我用的qwen3.5-plus
+LLM_API_KEY=  sk-****************
+LLM_BASE_URL= https://**************************/v1
+```
+
+------------------------------------------------------------
+
+####  <del> OpenAI API Keys
 
 ```
 OPENAI_API_KEY= ###your_openai_api_key
 ```
 
-#### Settings for Cognee
+####  <del> Settings for Cognee
 ```
 LLM_MODEL=gpt-4o-mini
 LLM_API_KEY=  ###your_api_key
 ```
 
-#### Other API Keys
+####  <del> Other API Keys
 ```
 Anthropic_API_KEY= ###your_anthropic_api
 Google_API_KEY=    ###your_google_api
