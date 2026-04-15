@@ -4,7 +4,7 @@
 
 我的.env文件格式：
 ```
-LLM_MODEL=************（我用的qwen3.5-plus）
+LLM_MODEL=************ #我用的qwen3.5-plus
 LLM_API_KEY=  sk-9****************b
 LLM_BASE_URL= https://**************************/v1
 ```
