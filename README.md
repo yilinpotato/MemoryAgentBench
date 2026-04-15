@@ -1,5 +1,14 @@
 # ⚙️ MemoryAgentBench: Evaluating Memory in LLM Agents via Incremental Multi-Turn Interactions
 
+------------------------------------------------------------
+
+我的.env文件格式：
+LLM_MODEL=************（我用的qwen3.5-plus）
+LLM_API_KEY=  sk-9****************b
+LLM_BASE_URL= https://**************************/v1
+
+------------------------------------------------------------
+
 [Yuanzhe Hu](https://hust-ai-hyz.github.io), [Yu Wang](https://yuwang.us), [Julian McAuley](https://cseweb.ucsd.edu/~jmcauley/).
 
 This project benchmarks agents with memory capabilities. Follow the steps below to set up your environment and install dependencies. 
