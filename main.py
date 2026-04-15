@@ -124,6 +124,11 @@ def process_queries_for_context(agent, query_answer_pairs, dataset_config, metri
         # Check if we've reached the query limit for ablation studies
         if has_reached_query_limit(max_queries, query_index):
             break
+
+        logger.info(
+            f"Processing query {query_index + 1}/{len(query_answer_pairs)} "
+            f"for context {context_index}"
+        )
         
         # Process the current query
         metrics, results = process_single_query(

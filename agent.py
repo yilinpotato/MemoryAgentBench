@@ -105,6 +105,24 @@ class AgentWrapper:
                 )
         except Exception:
             pass
+
+        openai_api_key = os.environ.get("OPENAI_API_KEY")
+        openai_base_url = os.environ.get("OPENAI_BASE_URL")
+        llm_api_key = os.environ.get("LLM_API_KEY")
+        llm_base_url = os.environ.get("LLM_BASE_URL")
+
+        # If a custom OpenAI-compatible endpoint is provided, prefer its matching key.
+        if llm_base_url:
+            return OpenAI(api_key=llm_api_key or openai_api_key, base_url=llm_base_url)
+
+        if openai_base_url:
+            return OpenAI(api_key=openai_api_key or llm_api_key, base_url=openai_base_url)
+
+        if llm_api_key and not openai_api_key:
+            return OpenAI(api_key=llm_api_key)
+
+        if openai_api_key:
+            return OpenAI(api_key=openai_api_key)
         return OpenAI()
 
     def _create_standard_response(self, output, input_tokens, output_tokens, memory_time, query_time):
@@ -120,15 +138,24 @@ class AgentWrapper:
     def _initialize_long_context_agent(self):
         """Initialize long context agent with appropriate client."""
         self.context = ''
-        
-        if "gpt" in self.model or "o4" in self.model:
+
+        model_name = self.model.lower()
+        use_openai_compatible = (
+            "gpt" in model_name
+            or "o4" in model_name
+            or "qwen" in model_name
+            or bool(os.environ.get("LLM_BASE_URL"))
+            or bool(os.environ.get("OPENAI_BASE_URL"))
+        )
+
+        if use_openai_compatible:
             self.client = self._create_oai_client()
-        elif "claude" in self.model:
+        elif "claude" in model_name:
             import anthropic
             self.client = anthropic.Anthropic(
                 api_key=os.environ.get('Anthropic_API_KEY'),
             )
-        elif "gemini" in self.model:
+        elif "gemini" in model_name:
             from google import genai
             self.client = genai.Client(api_key=os.environ.get('Google_API_KEY'))
         else:
@@ -293,6 +320,8 @@ class AgentWrapper:
 
     def _query_long_context_agent(self, message):
         """Process a query for long context agents."""
+        model_name = self.model.lower()
+
         # Get appropriate tokenizer
         try:
             tokenizer = tiktoken.encoding_for_model(self.model)
@@ -311,29 +340,36 @@ class AgentWrapper:
         
         # Query the model
         start_time = time.time()
-        
-        if "gpt" in self.model: 
+
+        use_openai_compatible = (
+            "gpt" in model_name
+            or "o4" in model_name
+            or "qwen" in model_name
+            or bool(os.environ.get("LLM_BASE_URL"))
+            or bool(os.environ.get("OPENAI_BASE_URL"))
+        )
+
+        if use_openai_compatible:
+            request_kwargs = {
+                "model": self.model,
+                "messages": formatted_message,
+            }
+
+            if "o4" not in model_name:
+                request_kwargs["temperature"] = self.temperature
+                request_kwargs["max_tokens"] = self.max_tokens
+
             response = self.client.chat.completions.create(
-                model=self.model,
-                messages=formatted_message,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
+                **request_kwargs
             )
             return self._format_openai_response(response, start_time)
-            
-        elif "o4" in self.model:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=formatted_message,
-            )
-            return self._format_openai_response(response, start_time)
-            
-        elif "claude" in self.model:
+
+        elif "claude" in model_name:
             return self._query_claude(full_message, system_message, start_time)
-            
-        elif "gemini" in self.model:
+
+        elif "gemini" in model_name:
             return self._query_gemini(formatted_message, start_time)
-            
+
         else:
             raise NotImplementedError(f"Model not supported: {self.model}")
 
@@ -864,7 +900,10 @@ class AgentWrapper:
         
         # Retrieve documents
         self.bm25_retriever.k = self.retrieve_num
-        bm25_documents = self.bm25_retriever.get_relevant_documents(retrieval_query)   
+        if hasattr(self.bm25_retriever, "invoke"):
+            bm25_documents = self.bm25_retriever.invoke(retrieval_query)
+        else:
+            bm25_documents = self.bm25_retriever.get_relevant_documents(retrieval_query)
         retrieval_context = [f"{doc.page_content}\n" for doc in bm25_documents] 
         memory_construction_time = time.time() - start_time
         

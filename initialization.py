@@ -27,6 +27,9 @@ def setup_configs_and_directories(command_line_args):
     # Load configuration files
     agent_config = _load_yaml_config(command_line_args.agent_config)
     dataset_config = _load_yaml_config(command_line_args.dataset_config)
+
+    # Allow one-shot model replacement for all agent yaml files.
+    _apply_model_override_from_env(agent_config)
     
     # Apply ablation study parameters if specified
     _apply_ablation_parameters(command_line_args, agent_config, dataset_config)
@@ -178,8 +181,22 @@ def initialize_and_memorize_agent(agent_config, dataset_config, agent_save_folde
 
 def _load_yaml_config(config_file_path):
     """Load and return YAML configuration from file."""
+    if os.path.isdir(config_file_path):
+        raise ValueError(
+            f"Expected a YAML file path, but got a directory: {config_file_path}"
+        )
     with open(config_file_path, 'r') as file:
         return yaml.safe_load(file)
+
+
+def _apply_model_override_from_env(agent_config):
+    """Override model name from env var when only one LLM endpoint is available."""
+    model_override = os.environ.get("LLM_MODEL_OVERRIDE", "").strip()
+    if not model_override:
+        model_override = os.environ.get("LLM_MODEL", "").strip()
+    if model_override:
+        print(f"\n\nUsing model override from env: {model_override}\n\n")
+        agent_config['model'] = model_override
 
 
 def _apply_ablation_parameters(command_line_args, agent_config, dataset_config):

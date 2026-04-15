@@ -426,7 +426,10 @@ def check_metrics(model, results_file, output_file, args):
         all_inputs.extend([fp, rp, pp])
 
     print("\n\n\n All answers are matched\n\n\n")
-    outputs = model.generate_batch(prompt=all_inputs, batch_file=output_file+".batch")
+    if args.use_batch_api:
+        outputs = model.generate_batch(prompt=all_inputs, batch_file=output_file+".batch")
+    else:
+        outputs = model.generate_batch(prompt=all_inputs)
     for idx, d in enumerate(tqdm(results["data"])):
         os = outputs[idx*3:idx*3+3]
         if any([x is None or x.get("output") is None for x in os]):
@@ -490,7 +493,8 @@ import fnmatch
     
 if __name__ == "__main__":
     from model_utils_openai import OpenAIModel
-    model = OpenAIModel("gpt-4o-2024-05-13", temperature=0.1, generation_max_length=4096)
+    eval_model = os.getenv("EVAL_MODEL") or os.getenv("LLM_MODEL") or "gpt-4o-mini"
+    model = OpenAIModel(eval_model, temperature=0.1, generation_max_length=4096)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_shards", type=int, default=1)
@@ -498,6 +502,7 @@ if __name__ == "__main__":
     parser.add_argument("--agent_to_check", nargs="+", default=[])
     parser.add_argument("--tag", type=str, default="v1")
     parser.add_argument('--huggingface_dataset_name', type=str, default="ai-hyz/MemoryAgentBench")
+    parser.add_argument('--use_batch_api', action='store_true', default=False)
     args = parser.parse_args()
     num_shards = args.num_shards
     shard_idx = args.shard_idx

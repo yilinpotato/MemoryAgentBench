@@ -12,7 +12,10 @@ import os
 import json
 import tiktoken
 import copy
-from minference import MInference
+try:
+    from minference import MInference
+except ImportError:
+    MInference = None
 
 logger = logging.get_logger(__name__)          
 
@@ -137,6 +140,12 @@ class Model:
         return inputs
 
     def minference_patch(self, model_type:str="meta-llama/Meta-Llama-3.1-8B-Instruct"):
+        if MInference is None:
+            raise ImportError(
+                "minference is required for LongLLM memo mode. "
+                "Install it in a CUDA dev environment with: "
+                "pip install --no-build-isolation minference==0.1.6.0"
+            )
         minference_patch = MInference("minference", model_type)
         self.model=minference_patch(self.model)
 

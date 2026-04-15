@@ -174,10 +174,35 @@ class OpenAIModel(LLM):
             self.model = openai.AzureOpenAI()
             model_name = model_name[model_name.index("/")+1:]
         else:
-            # make sure to set the OPENAI_API_KEY environment variable
-            self.model = openai.OpenAI()
+            # Support both OpenAI and OpenAI-compatible providers (e.g., qwen gateways).
+            def _clean_env(name: str) -> str:
+                value = os.getenv(name, "")
+                return value.strip().strip('"').strip("'")
+
+            llm_api_key = _clean_env("LLM_API_KEY")
+            llm_base_url = _clean_env("LLM_BASE_URL")
+            openai_api_key = _clean_env("OPENAI_API_KEY")
+            openai_base_url = _clean_env("OPENAI_BASE_URL")
+
+            if llm_base_url:
+                self.model = openai.OpenAI(api_key=llm_api_key or openai_api_key, base_url=llm_base_url)
+            elif openai_base_url:
+                self.model = openai.OpenAI(api_key=openai_api_key or llm_api_key, base_url=openai_base_url)
+            elif openai_api_key or llm_api_key:
+                self.model = openai.OpenAI(api_key=openai_api_key or llm_api_key)
+            else:
+                raise ValueError(
+                    "Missing API key: set OPENAI_API_KEY or LLM_API_KEY in .env/environment."
+                )
         self.model_name = model_name
-        self.tokenizer = tiktoken.encoding_for_model(model_name)
+        try:
+            self.tokenizer = tiktoken.encoding_for_model(model_name)
+        except KeyError:
+            logger.warning(
+                "Tokenizer mapping for model '%s' not found. Falling back to gpt-4o-mini tokenizer.",
+                model_name,
+            )
+            self.tokenizer = tiktoken.encoding_for_model("gpt-4o-mini")
         self.seed = seed
         self.API_MAX_LENGTH = 128000 # this is defined by the OPENAI API
 

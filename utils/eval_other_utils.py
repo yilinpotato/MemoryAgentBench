@@ -186,8 +186,9 @@ def chunk_text_into_sentences(text, model_name="gpt-4o-mini", chunk_size=4096):
     Returns:
         List of text chunks, each within the specified token limit
     """
-    # Ensure NLTK sentence tokenizer is available
+    # Ensure NLTK sentence tokenizer resources are available.
     nltk.download('punkt', quiet=True)
+    nltk.download('punkt_tab', quiet=True)
     
     # Initialize tokenizer with fallback
     try:
@@ -196,8 +197,13 @@ def chunk_text_into_sentences(text, model_name="gpt-4o-mini", chunk_size=4096):
         # Use fallback model if specified model is not recognized
         encoding = tiktoken.encoding_for_model("gpt-4o-mini")
 
-    # Split text into sentences
-    sentences = nltk.sent_tokenize(text)
+    # Split text into sentences with an extra runtime fallback.
+    try:
+        sentences = nltk.sent_tokenize(text)
+    except LookupError:
+        nltk.download('punkt', quiet=True)
+        nltk.download('punkt_tab', quiet=True)
+        sentences = nltk.sent_tokenize(text)
     
     text_chunks = []
     current_chunk_sentences = []
@@ -561,6 +567,13 @@ def _process_recsys_dataset(output, answer):
     """Process recommendation system dataset outputs."""
     # Load movie entity mapping
     entity_mapping_path = os.path.join('./processed_data/Recsys_Redial/', 'entity2id.json')
+    if not os.path.exists(entity_mapping_path):
+        logger.warning(
+            "Recsys entity mapping not found at %s. Falling back to default text metrics.",
+            entity_mapping_path,
+        )
+        return default_post_process(output, answer)
+
     name_to_id = json.load(open(entity_mapping_path))
     id_to_name = {entity_id: extract_movie_name(name) for name, entity_id in name_to_id.items()}
 

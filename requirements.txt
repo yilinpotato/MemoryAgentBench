@@ -94,5 +94,9 @@ accelerate
 owlready2
 
 # Memo RAG
-minference
-flash_attn
+# Optional GPU-only dependencies for MemoRAG.
+# Install manually in a CUDA devel environment (with nvcc), e.g.:
+#   pip install --no-build-isolation minference==0.1.6.0
+#   pip install flash-attn
+# minference
+# flash_attn

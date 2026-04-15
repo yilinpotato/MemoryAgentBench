@@ -12,6 +12,49 @@ import dotenv
 dotenv.load_dotenv()
 
 
+def _clean_env(name, default=""):
+    value = os.getenv(name, default)
+    if value is None:
+        return default
+    return value.strip().strip('"').strip("'")
+
+
+def _build_metric_client_and_model(default_model="gpt-4o"):
+    # Prefer custom OpenAI-compatible gateway variables for non-OpenAI providers.
+    llm_model = _clean_env("LLM_MODEL")
+    llm_api_key = _clean_env("LLM_API_KEY")
+    llm_base_url = _clean_env("LLM_BASE_URL")
+
+    openai_api_key = _clean_env("OPENAI_API_KEY")
+    openai_base_url = _clean_env("OPENAI_BASE_URL")
+
+    metric_model = llm_model or default_model
+
+    if llm_base_url:
+        api_key = llm_api_key or openai_api_key
+        if not api_key:
+            raise ValueError(
+                "Missing API key: set LLM_API_KEY (or OPENAI_API_KEY) when LLM_BASE_URL is configured."
+            )
+        return OpenAI(api_key=api_key, base_url=llm_base_url), metric_model
+
+    if openai_base_url:
+        api_key = openai_api_key or llm_api_key
+        if not api_key:
+            raise ValueError(
+                "Missing API key: set OPENAI_API_KEY (or LLM_API_KEY) when OPENAI_BASE_URL is configured."
+            )
+        return OpenAI(api_key=api_key, base_url=openai_base_url), metric_model
+
+    api_key = openai_api_key or llm_api_key
+    if not api_key:
+        raise ValueError(
+            "Missing API key: set OPENAI_API_KEY or LLM_API_KEY in your environment/.env."
+        )
+
+    return OpenAI(api_key=api_key), metric_model
+
+
 #@backoff.on_exception(backoff.expo, (openai.RateLimitError, openai.APIError))
 def chat_completions_with_backoff(client, **kwargs):
     return client.chat.completions.create(**kwargs)
@@ -93,8 +136,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     verbose = True
-    metric_model="gpt-4o"
-    metric_client = OpenAI()
+    metric_client, metric_model = _build_metric_client_and_model(default_model="gpt-4o")
     hyp_folder = f'./outputs/{args.evaluated_method}/Accurate_Retrieval'
     
     # make the output dir
@@ -104,10 +146,16 @@ if __name__ == '__main__':
     ## find the json file in the folder
     print('Evaluating method:', args.evaluated_method)
     if args.dataset == 'longmemeval_s':
+        hyp_file = None
         for root, _, files in os.walk(hyp_folder):
             for file in files:
                 if file.endswith('.json') and 'longmemeval_s_' in file and "*" not in file:
                     hyp_file = os.path.join(root, file)
+        if hyp_file is None:
+            raise FileNotFoundError(
+                f"No hypothesis file found in {hyp_folder} for dataset={args.dataset}. "
+                "Run generation first or check --evaluated_method."
+            )
         with open(hyp_file, 'r', encoding='utf-8') as f:
             hypotheses = (json.load(f))["data"]
         
@@ -115,10 +163,16 @@ if __name__ == '__main__':
         result_file = os.path.join(args.output_dir, '.eval-results-{}-{}'.format(args.evaluated_method, hyper_file_tag))
         references = load_references_from_huggingface(args.huggingface_dataset_name, args.dataset)
     elif args.dataset == 'longmemeval_s*':          
+        hyp_file = None
         for root, _, files in os.walk(hyp_folder):
             for file in files:
                 if 'longmemeval_s*_' in file:
                     hyp_file = os.path.join(root, file)
+        if hyp_file is None:
+            raise FileNotFoundError(
+                f"No hypothesis file found in {hyp_folder} for dataset={args.dataset}. "
+                "Run generation first or check --evaluated_method."
+            )
         
         print('Hypothesis file:', hyp_file)
         with open(hyp_file, 'r', encoding='utf-8') as f:
@@ -134,19 +188,31 @@ if __name__ == '__main__':
     qtypes = set(list(qid2qtype.values()))
     qtype2acc = {t: [] for t in qtypes}
 
+    if len(hypotheses) != len(references):
+        print(
+            f"Warning: hypotheses ({len(hypotheses)}) and references ({len(references)}) have different lengths. "
+            "Will evaluate only matched hypothesis entries."
+        )
+
     if not os.path.exists(result_file):
         with open(result_file, 'w') as out_f:
             logs = []
-            for idx, entry in tqdm(enumerate(references), total=len(references)):
-                if entry['question_id'] not in qid2qtype:
-                    print('Warning: skipping {} as it is not in reference data.'.format(entry['question_id']))
+            for idx, hyp_entry in tqdm(enumerate(hypotheses), total=len(hypotheses)):
+                # Prefer stable id-based alignment; fallback to positional alignment.
+                question_id = hyp_entry.get('qa_pair_id') or hyp_entry.get('question_id')
+                if question_id is None and idx < len(references):
+                    question_id = references[idx]['question_id']
+
+                if question_id not in qid2qtype:
+                    print('Warning: skipping {} as it is not in reference data.'.format(question_id))
                     continue
                 
-                qtype = qid2qtype[entry['question_id']]
-                q = qid2qdata[entry['question_id']]['question']
-                ans = qid2qdata[entry['question_id']]['answer']
-                hyp = hypotheses[idx]['output']
-                ans2= hypotheses[idx]['answer']
+                qtype = qid2qtype[question_id]
+                ref_entry = qid2qdata[question_id]
+                q = ref_entry['question']
+                ans = ref_entry['answer']
+                hyp = hyp_entry['output']
+                ans2 = hyp_entry.get('answer', ans)
                 if ans2 != ans:
                     print("ans2 != ans, please check the data.")
                     print('Reference answer:', ans)
@@ -166,13 +232,15 @@ if __name__ == '__main__':
                 completion = chat_completions_with_backoff(metric_client, **kwargs)
                 eval_response = completion.choices[0].message.content.strip()
                 label = 'yes' in eval_response.lower()
-                entry['autoeval_label'] = {
+
+                eval_entry = dict(ref_entry)
+                eval_entry['autoeval_label'] = {
                     'model': metric_model,
                     'label': label
                 }
                 ## entry without context
-                entry['context'] = None
-                logs.append(entry)
+                eval_entry['context'] = None
+                logs.append(eval_entry)
                 if verbose:
                     print(json.dumps({
                         'question': q,
@@ -180,8 +248,8 @@ if __name__ == '__main__':
                         'hypothesis': hyp,
                         'autoeval_label': label
                     }, indent=4), flush=True)
-                print(json.dumps(entry), file=out_f)
-                qtype2acc[qid2qtype[entry['question_id']]].append(1 if label else 0)
+                print(json.dumps(eval_entry), file=out_f)
+                qtype2acc[qid2qtype[question_id]].append(1 if label else 0)
 
                 
         print('Accuracy:', round(np.mean([1 if x['autoeval_label']['label'] else 0 for x in logs]).item(), 4))
