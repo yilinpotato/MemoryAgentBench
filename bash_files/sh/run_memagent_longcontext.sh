@@ -36,7 +36,7 @@ fi
 file_name=long_context_agents.txt
 line_no=${LINE_NO:-}
 config_list=${root}/bash_files/configs/${file_name}
-max_test_queries=${MAX_TEST_QUERIES_ABLATION:-0}
+max_test_queries=${MAX_TEST_QUERIES_ABLATION:-10}
 
 if [ ! -f "$config_list" ]; then
     echo "Config list not found: $config_list"

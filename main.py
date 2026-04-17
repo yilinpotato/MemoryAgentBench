@@ -40,7 +40,7 @@ def parse_command_line_arguments():
                        help='Path to dataset configuration file')
     parser.add_argument('--chunk_size_ablation', type=int, default=0,
                        help='Override chunk size for ablation studies (0 = use config default)')
-    parser.add_argument('--max_test_queries_ablation', type=int, default=0,
+    parser.add_argument('--max_test_queries_ablation', type=int, default=10,
                        help='Limit maximum test queries for ablation studies (0 = no limit)')
     parser.add_argument('--max_test_samples_ablation', type=int, default=10,
                        help='Limit maximum test samples for ablation studies (0 = no limit)')
@@ -116,9 +116,19 @@ def process_queries_for_context(agent, query_answer_pairs, dataset_config, metri
                                query_index, context_index, last_processed_query_id, max_queries,
                                agent_config, output_path, time_cost_list, start_time):
     """Process all queries for a given context."""
-    print(f"\n!!!!!Processing {len(query_answer_pairs)} queries for context {context_index}!!!!!\n")
+    if max_queries > 0:
+        remaining_budget = max(0, max_queries - query_index)
+        effective_query_total = min(len(query_answer_pairs), remaining_budget)
+    else:
+        effective_query_total = len(query_answer_pairs)
+
+    print(
+        f"\n!!!!!Processing {effective_query_total} queries for context {context_index} "
+        f"(raw: {len(query_answer_pairs)})!!!!!\n"
+    )
+    processed_in_context = 0
     
-    for query_data in tqdm(query_answer_pairs, total=len(query_answer_pairs)):
+    for query_data in tqdm(query_answer_pairs, total=effective_query_total):
         query, answer, qa_pair_id = unpack_query_data(query_data)
         
         # Skip queries that have already been processed
@@ -132,7 +142,7 @@ def process_queries_for_context(agent, query_answer_pairs, dataset_config, metri
             break
 
         logger.info(
-            f"Processing query {query_index + 1}/{len(query_answer_pairs)} "
+            f"Processing query {processed_in_context + 1}/{effective_query_total} "
             f"for context {context_index}"
         )
         
@@ -140,6 +150,7 @@ def process_queries_for_context(agent, query_answer_pairs, dataset_config, metri
         metrics, results = process_single_query(
             agent, query, answer, dataset_config, metrics, results, query_index, context_index, qa_pair_id
         )
+        processed_in_context += 1
         query_index += 1
         
         # Save results after each query (freq = 1)

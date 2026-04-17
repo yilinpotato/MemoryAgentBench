@@ -140,21 +140,35 @@ Follow these steps to evaluate the benchmarking agent:
 
 You can run an evaluation using the following example command:
 
+*这里的eniac文件夹我感觉其实是是改成了sh*
+
 #### Long Context Agents
+<del>bash bash_files/eniac/run_memagent_longcontext.sh</del>
 ```
-bash bash_files/eniac/run_memagent_longcontext.sh
+
+bash bash_files/sh/run_memagent_longcontext.sh
 ```
 - `--agent_config`: Path to the agent/model configuration file.
 - `--dataset_config`: Path to the dataset configuration file.
 
 #### Rag Agents and Agentic Memory Methods
-
+<del>bash bash_files/eniac/run_memagent_rag_agents.sh</del>
 ```
-bash bash_files/eniac/run_memagent_rag_agents.sh
+bash bash_files/sh/run_memagent_rag_agents.sh
 ```
 #### Ablation Study for Chunk Size
+<del>bash bash_files/eniac/run_memagent_rag_agents_chunksize.sh</del>
 ```
-bash bash_files/eniac/run_memagent_rag_agents_chunksize.sh
+bash bash_files/sh/run_memagent_rag_agents_chunksize.sh
+```
+
+当前默认是一次最多处理 10 个 query（`max_test_queries_ablation=10`）。
+
+如需改成其他 query 数量，可以这样覆盖：
+```
+MAX_TEST_QUERIES_ABLATION=20 bash bash_files/sh/run_memagent_longcontext.sh
+MAX_TEST_QUERIES_ABLATION=20 bash bash_files/sh/run_memagent_rag_agents.sh
+MAX_TEST_QUERIES_ABLATION=20 bash bash_files/sh/run_memagent_rag_agents_chunksize.sh
 ```
 
 Remember that `hipporag (2.0.0a3)` reuqires `openai==1.58.1`, which may cause some latest OpenAI models could not be used in same environment. 

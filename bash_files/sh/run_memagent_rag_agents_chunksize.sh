@@ -36,7 +36,7 @@ fi
 file_name=rag_agents_chunksize.txt
 line_no=${LINE_NO:-}
 config_list=${root}/bash_files/configs/${file_name}
-max_test_queries=${MAX_TEST_QUERIES_ABLATION:-0}
+max_test_queries=${MAX_TEST_QUERIES_ABLATION:-10}
 force_arg=""
 if [ "${FORCE_RUN:-0}" = "1" ]; then
     force_arg="--force"

@@ -126,6 +126,13 @@ def load_references_from_huggingface(huggingface_dataset_name, source_dataset_na
     return references
 
 
+def _safe_mean(values):
+    """Return None for empty values to avoid NaN warnings from numpy mean."""
+    if not values:
+        return None
+    return float(np.mean(values))
+
+
 if __name__ == '__main__':
     from argparse import ArgumentParser
     parser = ArgumentParser()
@@ -219,7 +226,13 @@ if __name__ == '__main__':
                     print('Hypothesis answer:', ans2)
                     raise ValueError('Answer in the hypothesis does not match the reference answer. Please check the data.')
                 
-                prompt = get_anscheck_prompt(qtype, q, ans, hyp, abstention='_abs' in entry['question_id'])
+                prompt = get_anscheck_prompt(
+                    qtype,
+                    q,
+                    ans,
+                    hyp,
+                    abstention='_abs' in question_id
+                )
                 kwargs = {
                     'model': metric_model,
                     'messages':[
@@ -252,18 +265,24 @@ if __name__ == '__main__':
                 qtype2acc[qid2qtype[question_id]].append(1 if label else 0)
 
                 
-        print('Accuracy:', round(np.mean([1 if x['autoeval_label']['label'] else 0 for x in logs]).item(), 4))
-        for k,v in qtype2acc.items():
-            print('\t{}: {} ({})'.format(k, round(np.mean(v), 4), len(v)))
+        overall_scores = [1 if x['autoeval_label']['label'] else 0 for x in logs]
+        overall_acc = _safe_mean(overall_scores)
+        print('Accuracy:', round(overall_acc, 4) if overall_acc is not None else 'N/A')
+        for k, v in qtype2acc.items():
+            acc = _safe_mean(v)
+            print('\t{}: {} ({})'.format(k, round(acc, 4) if acc is not None else 'N/A', len(v)))
 
         print('Saved to', result_file)
     else:
         print('Result file already exists. Skipping evaluation.')
         with open(result_file, 'r') as out_f:
             logs = [json.loads(line) for line in out_f.readlines()]
-        print('Accuracy:', round(np.mean([1 if x['autoeval_label']['label'] else 0 for x in logs]).item(), 4))
+        overall_scores = [1 if x['autoeval_label']['label'] else 0 for x in logs]
+        overall_acc = _safe_mean(overall_scores)
+        print('Accuracy:', round(overall_acc, 4) if overall_acc is not None else 'N/A')
         for log in logs:
             qtype2acc[qid2qtype[log['question_id']]].append(1 if log['autoeval_label']['label'] else 0)
             
-        for k,v in qtype2acc.items():
-            print('\t{}: {} ({})'.format(k, round(np.mean(v), 4), len(v)))
+        for k, v in qtype2acc.items():
+            acc = _safe_mean(v)
+            print('\t{}: {} ({})'.format(k, round(acc, 4) if acc is not None else 'N/A', len(v)))

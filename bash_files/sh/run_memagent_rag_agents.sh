@@ -46,6 +46,7 @@ model_dir=${MODEL_DIR:-gpt-4o-mini}
 line_no=${LINE_NO:-}
 export LLM_MODEL_OVERRIDE=${LLM_MODEL_OVERRIDE:-${LLM_MODEL:-}}
 config_list=${root}/bash_files/configs/${file_name}
+max_test_queries=${MAX_TEST_QUERIES_ABLATION:-10}
 
 if [ ! -f "$config_list" ]; then
     echo "Config list not found: $config_list"
@@ -91,7 +92,8 @@ do
     echo ................Start...........
     CUDA_VISIBLE_DEVICES=6 python main.py \
         --agent_config "$agent_config_path" \
-        --dataset_config "$dataset_config_path"
+        --dataset_config "$dataset_config_path" \
+        --max_test_queries_ablation "$max_test_queries"
     run_status=$?
     echo ................End...........
 
